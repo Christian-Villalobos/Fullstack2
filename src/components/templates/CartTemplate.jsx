@@ -3,8 +3,7 @@ import { Texts } from '../molecules/Texts';
 import { CartList } from '../organisms/CartList';
 import { Footer } from '../organisms/Footer';
 
-// Template: solo define la estructura de la página de carrito
-export function CartTemplate({ navbar, titles, cart, onAdd, onRemove, onClear, footer }) {
+export function CartTemplate({ navbar, titles, cart, onAdd, onRemove, onClear, onCheckout, footer }) {
     return (
         <div className="cart-template">
             {/* 1. Barra superior */}
@@ -19,6 +18,7 @@ export function CartTemplate({ navbar, titles, cart, onAdd, onRemove, onClear, f
                 onAdd={onAdd}
                 onRemove={onRemove}
                 onClear={onClear}
+                onCheckout={onCheckout}
             />
 
             {/* 4. Footer */}

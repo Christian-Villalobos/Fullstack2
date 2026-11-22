@@ -5,8 +5,7 @@ const cartTitles = [
     { variant: "p", content: "Revisa tus orbes antes de finalizar el intercambio", className: "subtitulo" }
 ];
 
-// Página: Recibe el estado del carrito y las funciones desde App.jsx
-export function CartPage({ navbar, footer, cart, onAdd, onRemove, onClear }) {
+export function CartPage({ navbar, footer, cart, onAdd, onRemove, onClear, onCheckout }) {
     return (
         <CartTemplate
             navbar={navbar}
@@ -15,6 +14,7 @@ export function CartPage({ navbar, footer, cart, onAdd, onRemove, onClear }) {
             onAdd={onAdd}
             onRemove={onRemove}
             onClear={onClear}
+            onCheckout={onCheckout}
             footer={footer}
         />
     );

@@ -1,13 +1,16 @@
 import { CartItem } from '../molecules/CartItem';
 import { Text } from '../atoms/Text';
 import { Button } from '../atoms/Button';
+import { useState } from 'react';
 
-// Organismo: lista completa del carrito + total + botón de vaciar y finalizar
-export function CartList({ cart = [], onAdd, onRemove, onClear }) {
+// Organismo: lista completa del carrito + total + botón de vaciar y checkout
+export function CartList({ cart = [], onAdd, onRemove, onClear, onCheckout }) {
+    const [isCheckingOut, setIsCheckingOut] = useState(false);
 
     // Calcula el total sumando precio * qty de cada producto
     const total = cart.reduce((sum, item) => {
-        const price = parseFloat(item.price.replace('$', '').replace(' USD', ''));
+        const raw = typeof item.price === 'number' ? item.price : item.price.replace('$', '').replace(' USD', '');
+        const price = parseFloat(raw) || 0;
         return sum + price * item.qty;
     }, 0);
 
@@ -27,6 +30,16 @@ export function CartList({ cart = [], onAdd, onRemove, onClear }) {
             </div>
         );
     }
+
+    const handleCheckoutClick = async () => {
+        if (!onCheckout) return;
+        setIsCheckingOut(true);
+        try {
+            await onCheckout();
+        } finally {
+            setIsCheckingOut(false);
+        }
+    };
 
     return (
         <div className="cart-list">
@@ -50,17 +63,15 @@ export function CartList({ cart = [], onAdd, onRemove, onClear }) {
                     Total: <strong>${total.toFixed(2)} USD</strong>
                 </Text>
                 <div className="cart-actions">
-                    <Button className="btn-white" onClick={onClear}>
+                    <Button className="btn-white" onClick={onClear} disabled={isCheckingOut}>
                         Vaciar carrito
                     </Button>
                     <Button
                         className="btn-gold"
-                        onClick={() => {
-                            alert('¡Gracias por tu compra, exiliado! Tu pedido está en camino.');
-                            onClear();
-                        }}
+                        onClick={handleCheckoutClick}
+                        disabled={isCheckingOut}
                     >
-                        Finalizar compra
+                        {isCheckingOut ? 'Procesando orden...' : 'Finalizar compra'}
                     </Button>
                 </div>
             </div>

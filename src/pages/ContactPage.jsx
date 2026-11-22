@@ -1,4 +1,5 @@
 import { ContactTemplate } from '../components/templates/ContactTemplate';
+import { saveContactMessage } from '../services/contact';
 
 const contactTitles = [
   { variant: "h1", content: "Contacto y Soporte", className: "titulo-principal" },
@@ -20,20 +21,21 @@ const contactCards = [
   }
 ];
 
-const contactForm = {
-  fields: [
-    { label: "Nombre o IGN (In-Game Name)", type: "text", name: "name", placeholder: "Ej. Marauder99" },
-    { label: "Correo electrónico", type: "email", name: "email", placeholder: "tu@correo.com" },
-    { label: "Asunto", type: "text", name: "subject", placeholder: "¿En qué podemos ayudarte?" },
-    { label: "Mensaje", type: "text", name: "message", placeholder: "Describe los detalles de tu consulta u orden..." }
-  ],
-  buttonText: "Enviar Mensaje",
-  onSubmit: (data) => {
-    alert(`¡Gracias por contactarnos, ${data.name || 'exiliado'}! Tu mensaje ha sido enviado correctamente.`);
-  }
-};
-
 export function ContactPage({ navbar, footer }) {
+  const contactForm = {
+    fields: [
+      { label: "Nombre o IGN (In-Game Name)", type: "text", name: "name", placeholder: "Ej. Marauder99" },
+      { label: "Correo electrónico", type: "email", name: "email", placeholder: "tu@correo.com" },
+      { label: "Asunto", type: "text", name: "subject", placeholder: "¿En qué podemos ayudarte?" },
+      { label: "Mensaje", type: "text", name: "message", placeholder: "Describe los detalles de tu consulta u orden..." }
+    ],
+    buttonText: "Enviar Mensaje",
+    onSubmit: async (data) => {
+      const res = await saveContactMessage(data);
+      alert(res.message);
+    }
+  };
+
   return (
     <ContactTemplate
       navbar={navbar}

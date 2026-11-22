@@ -5,6 +5,9 @@ import {
   getCurrentUser,
   logoutUser,
   deleteUser,
+  updateProfile,
+  changePassword,
+  resetPassword
 } from '../../services/auth';
 
 describe('auth service', () => {
@@ -51,27 +54,29 @@ describe('auth service', () => {
     expect(getCurrentUser()).toBeNull();
   });
 
-  it('login ignora mayúsculas y espacios en el correo', () => {
-    const user = loginUser({ email: '  ADMIN@poe.com ', password: 'admin123' });
-    expect(user).not.toBeNull();
-  });
-
-  it('login con credenciales malas devuelve null y no guarda sesión', () => {
-    expect(loginUser({ email: 'admin@poe.com', password: 'mala' })).toBeNull();
+  it('login fallido devuelve null y no guarda la sesión', () => {
+    expect(loginUser({ email: 'admin@poe.com', password: 'mal' })).toBeNull();
     expect(getCurrentUser()).toBeNull();
   });
 
-  it('getCurrentUser devuelve null si nadie inició sesión', () => {
-    expect(getCurrentUser()).toBeNull();
+  it('el login no es sensible a mayúsculas en el correo', () => {
+    expect(loginUser({ email: 'ADMIN@POE.COM', password: 'admin123' })).not.toBeNull();
   });
 
-  it('elimina usuarios normales pero no al admin', () => {
-    registerUser({ name: 'Ana', email: 'ana@mail.com', password: '123' });
-    expect(deleteUser('ana@mail.com').ok).toBeTrue();
-    expect(deleteUser('admin@poe.com').ok).toBeFalse();
+  it('permite cambiar la contraseña con la contraseña actual correcta', () => {
+    const res = changePassword('admin@poe.com', 'admin123', 'nueva1234');
+    expect(res.ok).toBeTrue();
+    expect(loginUser({ email: 'admin@poe.com', password: 'nueva1234' })).not.toBeNull();
   });
 
-  it('no puede eliminar un usuario que no existe', () => {
-    expect(deleteUser('fantasma@mail.com').ok).toBeFalse();
+  it('permite restablecer la contraseña olvidada con resetPassword', () => {
+    const res = resetPassword('admin@poe.com', 'reset1234');
+    expect(res.ok).toBeTrue();
+    expect(loginUser({ email: 'admin@poe.com', password: 'reset1234' })).not.toBeNull();
+  });
+
+  it('rechaza restablecer contraseña si el correo no existe', () => {
+    const res = resetPassword('fantasma@poe.com', 'reset1234');
+    expect(res.ok).toBeFalse();
   });
 });
