@@ -1,102 +1,188 @@
-// Aquí vive toda la "base de datos" simulada con localStorage.
-// localStorage solo guarda texto, por eso usamos JSON.stringify (objeto → texto)
-// y JSON.parse (texto → objeto).
+import { apiRequest } from './api';
 
-// Nombres con los que se guardan los datos en el navegador
 const USERS_KEY = "poe_users";
 const CURRENT_USER_KEY = "poe_current_user";
 
-// Usuario administrador que existe desde el inicio
+// Fallback por defecto si no hay conexión
 const defaultUsers = [
-    { name: "Administrador", email: "admin@poe.com", password: "admin123", role: "admin" }
+  { id: 1, name: "Administrador", email: "admin@poe.com", password: "admin123", role: "ROLE_ADMIN" }
 ];
 
-// Devuelve la lista de usuarios guardados.
-// Si es la primera vez (no hay nada guardado), guarda al administrador y lo devuelve.
 export function getUsers() {
-    const saved = localStorage.getItem(USERS_KEY);
-
-    if (saved) {
-        return JSON.parse(saved);
-    }
-
-    const initial = defaultUsers.map(user => ({ ...user }));
-    localStorage.setItem(USERS_KEY, JSON.stringify(initial));
-    return initial;
+  const saved = localStorage.getItem(USERS_KEY);
+  if (saved) {
+    return JSON.parse(saved);
+  }
+  const initial = defaultUsers.map(user => ({ ...user }));
+  localStorage.setItem(USERS_KEY, JSON.stringify(initial));
+  return initial;
 }
 
-// Registra un usuario nuevo.
-// Devuelve { ok: true/false, message: "texto para mostrar" }
-export function registerUser({ name = '', email = '', password = '' }) {
-    // Limpiamos espacios y pasamos el correo a minúsculas
-    const cleanName = name.trim();
-    const cleanEmail = email.trim().toLowerCase();
-
-    // Validación simple: no se permiten campos vacíos
-    if (!cleanName || !cleanEmail || !password) {
-        return { ok: false, message: 'Completa todos los campos.' };
-    }
-
-    const users = getUsers();
-
-    // some() devuelve true si ALGÚN usuario ya tiene ese correo
-    if (users.some(user => user.email === cleanEmail)) {
-        return { ok: false, message: 'El correo ya está registrado.' };
-    }
-
-    // Agregamos el usuario nuevo (todos los que se registran son "user")
-    users.push({ name: cleanName, email: cleanEmail, password, role: 'user' });
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-
-    return { ok: true, message: '¡Registro exitoso! Ahora inicia sesión.' };
-}
-
-// Revisa si el correo y la contraseña coinciden con algún usuario.
-// Si coinciden, guarda quién inició sesión y devuelve ese usuario.
-// Si no, devuelve null.
-export function loginUser({ email = '', password = '' }) {
-    const cleanEmail = email.trim().toLowerCase();
-
-    // find() devuelve el primer usuario que cumpla la condición (o undefined)
-    const user = getUsers().find(u => u.email === cleanEmail && u.password === password);
-
-    if (!user) {
-        return null;
-    }
-
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-    return user;
-}
-
-// Devuelve el usuario que tiene la sesión iniciada (o null si no hay)
 export function getCurrentUser() {
-    const saved = localStorage.getItem(CURRENT_USER_KEY);
-    return saved ? JSON.parse(saved) : null;
+  const saved = localStorage.getItem(CURRENT_USER_KEY);
+  return saved ? JSON.parse(saved) : null;
 }
 
-// Cierra la sesión: borra al usuario actual
 export function logoutUser() {
-    localStorage.removeItem(CURRENT_USER_KEY);
+  localStorage.removeItem(CURRENT_USER_KEY);
 }
 
-// NUEVO: elimina un usuario usando su correo (el correo es único).
-// Devuelve { ok: true/false, message: "texto para mostrar" }
-export function deleteUser(email) {
-    const users = getUsers();
+// Iniciar sesión (con Backend y fallback)
+export async function loginUser({ email = '', password = '' }) {
+  const cleanEmail = email.trim().toLowerCase();
+  
+  try {
+    const user = await apiRequest('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: cleanEmail, password })
+    });
 
-    // Buscamos al usuario que se quiere borrar
-    const userToDelete = users.find(user => user.email === email);
-
-    // No se puede borrar si no existe o si es administrador
-    if (!userToDelete || userToDelete.role === 'admin') {
-        return { ok: false, message: 'No se puede eliminar este usuario.' };
+    if (user) {
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+      return { ok: true, user };
     }
+  } catch (error) {
+    console.warn('Backend login error or offline. Checking fallback...', error.message);
+    // Fallback a localStorage si el backend no está disponible o falla
+    const localUser = getUsers().find(u => u.email === cleanEmail && u.password === password);
+    if (localUser) {
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(localUser));
+      return { ok: true, user: localUser };
+    }
+    return { ok: false, message: error.message || 'Correo o contraseña incorrectos.' };
+  }
+  return { ok: false, message: 'Correo o contraseña incorrectos.' };
+}
 
-    // filter() crea una lista nueva con todos los usuarios MENOS el que tiene ese correo
-    const updatedUsers = users.filter(user => user.email !== email);
+// Registrar usuario (con Backend y fallback)
+export async function registerUser({ name = '', email = '', password = '' }) {
+  const cleanName = name.trim();
+  const cleanEmail = email.trim().toLowerCase();
 
-    // Guardamos la lista nueva en localStorage
-    localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
+  if (!cleanName || !cleanEmail || !password) {
+    return { ok: false, message: 'Completa todos los campos.' };
+  }
 
-    return { ok: true, message: 'Usuario eliminado.' };
+  try {
+    const user = await apiRequest('/api/v1/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name: cleanName, email: cleanEmail, password })
+    });
+    return { ok: true, message: '¡Registro exitoso! Ya puedes iniciar sesión.', user };
+  } catch (error) {
+    console.warn('Backend register error, trying fallback...', error.message);
+    const users = getUsers();
+    if (users.some(u => u.email === cleanEmail)) {
+      return { ok: false, message: 'El correo ya está registrado.' };
+    }
+    const newUser = { id: Date.now(), name: cleanName, email: cleanEmail, password, role: 'ROLE_USER' };
+    users.push(newUser);
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    return { ok: true, message: '¡Registro exitoso! Ahora inicia sesión.' };
+  }
+}
+
+// Recuperar / Restablecer contraseña
+export async function resetPassword(email = '', newPassword = '') {
+  const cleanEmail = email.trim().toLowerCase();
+
+  if (!cleanEmail || !newPassword) {
+    return { ok: false, message: 'Ingresa tu correo y la nueva contraseña.' };
+  }
+
+  try {
+    const res = await apiRequest('/api/v1/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email: cleanEmail, newPassword })
+    });
+    return { ok: true, message: res.message || 'Contraseña restablecida con éxito' };
+  } catch (error) {
+    console.warn('Backend resetPassword error, trying fallback...', error.message);
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.email === cleanEmail);
+    if (userIndex === -1) {
+      return { ok: false, message: 'No existe ninguna cuenta registrada con este correo.' };
+    }
+    users[userIndex].password = newPassword;
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    return { ok: true, message: '¡Tu contraseña ha sido restablecida exitosamente! Ya puedes iniciar sesión.' };
+  }
+}
+
+// Cambiar contraseña (Perfil)
+export async function changePassword(user, currentPassword, newPassword) {
+  if (!currentPassword || !newPassword) {
+    return { ok: false, message: 'Debes ingresar tu contraseña actual y la nueva contraseña.' };
+  }
+
+  const userId = typeof user === 'object' ? user.id : null;
+  const userEmail = typeof user === 'object' ? user.email : user;
+
+  if (userId) {
+    try {
+      const res = await apiRequest(`/api/v1/users/${userId}/change-password`, {
+        method: 'PATCH',
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      return { ok: true, message: res.message || 'Contraseña actualizada exitosamente.' };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  }
+
+  // Fallback por correo si no hay userId
+  const users = getUsers();
+  const userIndex = users.findIndex(u => u.email === userEmail);
+  if (userIndex === -1) return { ok: false, message: 'Usuario no encontrado.' };
+  if (users[userIndex].password !== currentPassword) {
+    return { ok: false, message: 'La contraseña actual no es correcta.' };
+  }
+  users[userIndex].password = newPassword;
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  return { ok: true, message: 'Contraseña cambiada exitosamente.' };
+}
+
+// Actualizar perfil (nombre)
+export async function updateProfile(user, { name = '' }) {
+  const cleanName = name.trim();
+  if (!cleanName) {
+    return { ok: false, message: 'El nombre no puede estar vacío.' };
+  }
+
+  const userId = typeof user === 'object' ? user.id : null;
+
+  if (userId) {
+    try {
+      const updated = await apiRequest(`/api/v1/users/${userId}/profile`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: cleanName })
+      });
+      const currentUser = getCurrentUser();
+      const newSession = { ...currentUser, ...updated };
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newSession));
+      return { ok: true, message: 'Perfil actualizado con éxito.', user: newSession };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  }
+
+  // Fallback local
+  const currentUser = getCurrentUser();
+  if (currentUser) {
+    currentUser.name = cleanName;
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
+  }
+  return { ok: true, message: 'Perfil actualizado con éxito.' };
+}
+
+// Eliminar usuario (Admin)
+export function deleteUser(email) {
+  const users = getUsers();
+  const userToDelete = users.find(u => u.email === email);
+  if (!userToDelete || userToDelete.role === 'ROLE_ADMIN' || userToDelete.role === 'admin') {
+    return { ok: false, message: 'No se puede eliminar este usuario.' };
+  }
+  const updatedUsers = users.filter(u => u.email !== email);
+  localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
+  return { ok: true, message: 'Usuario eliminado.' };
 }

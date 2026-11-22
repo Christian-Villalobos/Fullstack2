@@ -3,8 +3,8 @@ import { Text } from '../atoms/Text';
 // Organismo: tarjeta con los datos del usuario que inició sesión
 // user: { name, email, role }
 export function ProfileCard({ user }) {
-    // true si el usuario es administrador
-    const isAdmin = user.role === 'admin';
+    // true si el usuario es administrador (compatible con 'admin' y 'ROLE_ADMIN')
+    const isAdmin = user.role === 'admin' || user.role === 'ROLE_ADMIN';
 
     return (
         <div className="profile-card">

@@ -9,8 +9,12 @@ import { ContactPage } from './pages/ContactPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { TermsPage } from './pages/TermsPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { EditProfilePage } from './pages/EditProfilePage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ManageProductsPage } from './pages/ManageProductsPage';
 import { getCurrentUser, logoutUser } from './services/auth';
-import { getCart, saveCart } from './services/cart';            // NUEVO
+import { getLocalCart, saveLocalCart, syncAddToCart, syncClearCart } from './services/cart';
+import { checkoutOrder } from './services/orders';
 
 // Estilos globales y modulares
 import './styles/global.css';
@@ -36,35 +40,24 @@ import './styles/organisms/UserList.css';
 
 function App() {
   // ── Sesión ──
-  // currentUser guarda quién inició sesión (null si nadie).
-  // Va antes del carrito porque el carrito necesita saber si hay sesión.
   const [currentUser, setCurrentUser] = useState(getCurrentUser);
 
   // ── Estado del carrito ──
-  // El carrito vive en App para que sea accesible desde cualquier página.
-  // Funciones:
-  //   addToCart(product)   → agrega 1 unidad; si ya existe, suma qty (solo con sesión iniciada)
-  //   removeFromCart(name) → quita 1 unidad; si qty llega a 0, elimina el item
-  //   clearCart()          → vacía el carrito completamente
+  const [cart, setCart] = useState(() => (currentUser ? getLocalCart() : []));
 
-  // CAMBIO: el carrito ahora empieza con lo que haya guardado en localStorage,
-  // pero solo si hay una sesión iniciada. Si no hay sesión, empieza vacío.
-  const [cart, setCart] = useState(() => (currentUser ? getCart() : []));
-
-  // NUEVO: cada vez que "cart" cambia (agregar, quitar, vaciar), lo guardamos en localStorage.
-  // El [cart] del final significa: "ejecuta esto solo cuando cart cambie".
   useEffect(() => {
-    saveCart(cart);
+    saveLocalCart(cart);
   }, [cart]);
 
   const addToCart = (product) => {
-    // Si no hay sesión iniciada, no dejamos comprar.
-    // Avisamos, llevamos a la persona al login y salimos de la función con return.
     if (!currentUser) {
       alert('Debes iniciar sesión para comprar.');
       window.location.hash = '#login';
       return;
     }
+
+    // Sincronizar en segundo plano con el backend
+    syncAddToCart(currentUser.id, product, 1);
 
     setCart(prev => {
       const exists = prev.find(item => item.name === product.name);
@@ -87,35 +80,73 @@ function App() {
     );
   };
 
-  const clearCart = () => setCart([]);
+  const clearCart = () => {
+    if (currentUser) syncClearCart(currentUser.id);
+    setCart([]);
+  };
 
-  // Total de unidades en el carrito (para el badge del navbar)
+  const handleCheckout = async () => {
+    if (!currentUser) {
+      alert('Debes iniciar sesión para finalizar la compra.');
+      window.location.hash = '#login';
+      return;
+    }
+
+    if (cart.length === 0) {
+      alert('Tu carrito está vacío.');
+      return;
+    }
+
+    const res = await checkoutOrder(currentUser, cart);
+    alert(res.message);
+
+    if (res.ok) {
+      clearCart();
+      window.location.hash = '#perfil'; // Llevar al perfil para ver la orden creada
+    }
+  };
+
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
 
-  // Cierra la sesión, actualiza el navbar y vuelve al inicio
   const handleLogout = () => {
     logoutUser();
     setCurrentUser(null);
-    clearCart();                    // Al cerrar sesión se vacía el carrito (y el useEffect lo guarda vacío)
+    clearCart();
     window.location.hash = '#inicio';
   };
 
   // ── Navegación por hash ──
   const getPageFromHash = () => {
-    const hash = window.location.hash.toLowerCase();
+    const rawHash = window.location.hash || '';
+    let hash = '';
+    try {
+      hash = decodeURIComponent(rawHash).toLowerCase().trim();
+    } catch {
+      hash = rawHash.toLowerCase().trim();
+    }
 
-    if (hash === '#inicio')        return 'home';
+    if (hash === '#inicio') return 'home';
     if (hash === '#quienes-somos') return 'about';
-    if (hash === '#tienda')        return 'shop';
-    if (hash === '#carrito')       return 'cart';
-    if (hash === '#contacto')      return 'contact';
-    if (hash === '#privacidad')    return 'privacy';
-    if (hash === '#terminos')      return 'terms';
-    if (hash === '#registro')      return 'register';
-    if (hash === '#login')         return 'login';
-    if (hash === '#perfil')        return 'profile';
+    if (hash === '#tienda') return 'shop';
+    if (hash === '#carrito') return 'cart';
+    if (hash === '#contacto') return 'contact';
+    if (hash === '#privacidad') return 'privacy';
+    if (hash === '#terminos') return 'terms';
+    if (hash === '#registro') return 'register';
+    if (hash === '#login') return 'login';
+    if (hash === '#perfil') return 'profile';
+    if (hash === '#editar-perfil') return 'edit-profile';
+    if (hash === '#admin-productos') return 'manage-products';
+    
+    if (
+      hash === '#recuperar-contrasena' ||
+      hash === '#recuperar-contraseña' ||
+      hash.includes('recuperar') ||
+      hash.includes('olvido')
+    ) {
+      return 'forgot-password';
+    }
 
-    // Si el hash no coincide con ninguno (o está vacío), mostramos home
     return 'home';
   };
 
@@ -124,28 +155,32 @@ function App() {
   useEffect(() => {
     const handleHashChange = () => {
       setCurrentPage(getPageFromHash());
-      // Cada vez que se cambia de página, revisamos si hay sesión iniciada
       setCurrentUser(getCurrentUser());
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // ── Datos compartidos ──
+  const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'ROLE_ADMIN');
+
+  const navbarLinks = [
+    { label: "Inicio",        href: "#inicio" },
+    { label: "Quienes somos", href: "#quienes-somos" },
+    { label: "Tienda",        href: "#tienda" },
+    { label: cartCount > 0 ? `🛒 Carrito (${cartCount})` : "🛒 Carrito", href: "#carrito" }
+  ];
+
+  if (isAdmin) {
+    navbarLinks.push({ label: "📦 Gestión Productos", href: "#admin-productos" });
+  }
+
   const navbarData = {
     logo: {
       src: '/images/logo.webp',
       alt: "Logo del sitio",
       className: "navbar-logo"
     },
-    links: [
-      { label: "Inicio",        href: "#inicio" },
-      { label: "Quienes somos", href: "#quienes-somos" },
-      { label: "Tienda",        href: "#tienda" },
-      // Badge dinámico: muestra la cantidad de items en el carrito
-      { label: cartCount > 0 ? `🛒 Carrito (${cartCount})` : "🛒 Carrito", href: "#carrito" }
-    ],
-    // Los botones cambian según haya o no una sesión iniciada
+    links: navbarLinks,
     buttons: currentUser
       ? [
           { label: "Mi perfil",      onClick: () => { window.location.hash = '#perfil'; }, className: "btn-gold" },
@@ -168,16 +203,19 @@ function App() {
 
   return (
     <>
-      {currentPage === 'home'     && <HomePage     navbar={navbarData} footer={footerData} />}
-      {currentPage === 'about'    && <AboutPage    navbar={navbarData} footer={footerData} />}
-      {currentPage === 'shop'     && <ShopPage     navbar={navbarData} footer={footerData} onAddToCart={addToCart} />}
-      {currentPage === 'cart'     && <CartPage     navbar={navbarData} footer={footerData} cart={cart} onAdd={addToCart} onRemove={removeFromCart} onClear={clearCart} />}
-      {currentPage === 'contact'  && <ContactPage  navbar={navbarData} footer={footerData} />}
-      {currentPage === 'privacy'  && <PrivacyPage  navbar={navbarData} footer={footerData} />}
-      {currentPage === 'terms'    && <TermsPage    navbar={navbarData} footer={footerData} />}
-      {currentPage === 'register' && <RegisterPage navbar={navbarData} footer={footerData} />}
-      {currentPage === 'login'    && <LoginPage    navbar={navbarData} footer={footerData} />}
-      {currentPage === 'profile'  && <ProfilePage  navbar={navbarData} footer={footerData} />}
+      {currentPage === 'home'            && <HomePage            navbar={navbarData} footer={footerData} />}
+      {currentPage === 'about'           && <AboutPage           navbar={navbarData} footer={footerData} />}
+      {currentPage === 'shop'            && <ShopPage            navbar={navbarData} footer={footerData} onAddToCart={addToCart} />}
+      {currentPage === 'cart'            && <CartPage            navbar={navbarData} footer={footerData} cart={cart} onAdd={addToCart} onRemove={removeFromCart} onClear={clearCart} onCheckout={handleCheckout} />}
+      {currentPage === 'contact'         && <ContactPage         navbar={navbarData} footer={footerData} />}
+      {currentPage === 'privacy'         && <PrivacyPage         navbar={navbarData} footer={footerData} />}
+      {currentPage === 'terms'           && <TermsPage           navbar={navbarData} footer={footerData} />}
+      {currentPage === 'register'        && <RegisterPage        navbar={navbarData} footer={footerData} />}
+      {currentPage === 'login'           && <LoginPage           navbar={navbarData} footer={footerData} />}
+      {currentPage === 'profile'         && <ProfilePage         navbar={navbarData} footer={footerData} />}
+      {currentPage === 'edit-profile'    && <EditProfilePage     navbar={navbarData} footer={footerData} onUserUpdated={(u) => setCurrentUser(u)} />}
+      {currentPage === 'forgot-password' && <ForgotPasswordPage  navbar={navbarData} footer={footerData} />}
+      {currentPage === 'manage-products' && <ManageProductsPage  navbar={navbarData} footer={footerData} />}
     </>
   );
 }
