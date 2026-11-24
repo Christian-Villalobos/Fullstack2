@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'https://backend-parcial-3-monolito.onrender.com/';
 
 export async function apiRequest(endpoint, options = {}) {
   const defaultHeaders = {
