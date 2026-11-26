@@ -5,7 +5,6 @@ import { Input } from '../atoms/Input';
 
 export function EditProfileTemplate({
   navbar,
-  titles,
   user,
   onUpdateProfile,
   onChangePassword,

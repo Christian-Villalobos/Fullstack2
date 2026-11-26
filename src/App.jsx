@@ -110,7 +110,7 @@ function App() {
   // ── Navegación por hash ──
   const getPageFromHash = () => {
     const rawHash = window.location.hash || '';
-    let hash = '';
+    let hash;
     try {
       hash = decodeURIComponent(rawHash).toLowerCase().trim();
     } catch {

@@ -31,6 +31,14 @@ export function ContactPage({ navbar, footer }) {
     ],
     buttonText: "Enviar Mensaje",
     onSubmit: async (data) => {
+      if ((data.subject?.trim() || '').length < 3) {
+        alert('El asunto debe tener al menos 3 caracteres.');
+        return;
+      }
+      if ((data.message?.trim() || '').length < 10) {
+        alert('El mensaje debe tener al menos 10 caracteres.');
+        return;
+      }
       const res = await saveContactMessage(data);
       alert(res.message);
     }

@@ -41,7 +41,7 @@ export function ProductManager({ products = [], onAddProduct, onDeleteProduct })
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({ text: '', type: '' });
 
@@ -52,14 +52,14 @@ export function ProductManager({ products = [], onAddProduct, onDeleteProduct })
       return;
     }
 
-    const res = onAddProduct({ name, price, src: finalSrc });
-    if (res.ok) {
+    const res = await onAddProduct({ name, price, src: finalSrc });
+    if (res?.ok) {
       setMessage({ text: res.message, type: 'success' });
       setName('');
       setPrice('');
       setImagePreview('');
     } else {
-      setMessage({ text: res.message, type: 'error' });
+      setMessage({ text: res?.message || 'Error al agregar producto', type: 'error' });
     }
   };
 
