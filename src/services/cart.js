@@ -1,4 +1,5 @@
 import { apiRequest } from './api';
+import { IMAGES } from '../constants/images';
 
 const CART_KEY = "poe_cart";
 
@@ -25,7 +26,7 @@ export async function getCart(userId) {
           name: item.productName,
           price: `$${item.unitPrice.toFixed(2)} USD`,
           qty: item.quantity,
-          src: item.imageUrl || '/images/divine.webp',
+          src: item.imageUrl || IMAGES.divine,
           alt: item.productName
         }));
         saveLocalCart(mapped);

@@ -80,12 +80,20 @@ export function OrderList({ orders = [], onUpdateStatus, isAdmin = false }) {
                 {isAdmin && (
                   <td className="py-3 px-2 text-right">
                     {order.status === 'PENDING' && (
-                      <Button
-                        className="btn-gold text-xs py-1 px-2"
-                        onClick={() => onUpdateStatus(order.id, 'COMPLETED')}
-                      >
-                        Marcar Entregado
-                      </Button>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          className="btn-gold text-xs py-1 px-2"
+                          onClick={() => onUpdateStatus(order.id, 'COMPLETED')}
+                        >
+                          Entregar
+                        </Button>
+                        <Button
+                          className="btn-danger text-xs py-1 px-2"
+                          onClick={() => onUpdateStatus(order.id, 'CANCELLED')}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
                     )}
                   </td>
                 )}

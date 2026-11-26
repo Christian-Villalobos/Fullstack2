@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ManageProductsTemplate } from '../components/templates/ManageProductsTemplate';
 import { getCurrentUser, isAdminUser } from '../services/auth';
-import { getProducts, addProduct, deleteProduct, defaultProducts } from '../services/products';
+import { getProducts, addProduct, deleteProduct, updateProductStock, defaultProducts } from '../services/products';
 
 export function ManageProductsPage({ navbar, footer }) {
   // Se lee una sola vez: así el objeto no cambia en cada render
@@ -51,12 +51,21 @@ export function ManageProductsPage({ navbar, footer }) {
     }
   };
 
+  const handleUpdateStock = async (id, quantity) => {
+    const res = await updateProductStock(id, quantity);
+    alert(res.message);
+    if (res.ok) {
+      await loadProducts();
+    }
+  };
+
   return (
     <ManageProductsTemplate
       navbar={navbar}
       products={products}
       onAddProduct={handleAddProduct}
       onDeleteProduct={handleDeleteProduct}
+      onUpdateStock={handleUpdateStock}
       footer={footer}
     />
   );

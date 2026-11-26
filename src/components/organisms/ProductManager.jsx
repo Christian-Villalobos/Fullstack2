@@ -2,23 +2,27 @@ import { useState } from 'react';
 import { Text } from '../atoms/Text';
 import { Button } from '../atoms/Button';
 import { Input } from '../atoms/Input';
+import { uploadImageToImgBB } from '../../services/imageUpload';
+import { IMAGES } from '../../constants/images';
 
-export function ProductManager({ products = [], onAddProduct, onDeleteProduct }) {
+export function ProductManager({ products = [], onAddProduct, onDeleteProduct, onUpdateStock }) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [imageMode, setImageMode] = useState('upload'); // 'upload' o 'preset'
+  const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
-  const [selectedPreset, setSelectedPreset] = useState('/images/divine.webp');
+  const [selectedPreset, setSelectedPreset] = useState(IMAGES.divine);
   const [message, setMessage] = useState({ text: '', type: '' });
+  const [isUploading, setIsUploading] = useState(false);
 
   const availablePresets = [
-    { label: 'Divine Orb', src: '/images/divine.webp' },
-    { label: 'Chaos Orb', src: '/images/chaos.webp' },
-    { label: 'Mirror of Kalandra', src: '/images/mirror.webp' },
-    { label: 'Exalted Orb', src: '/images/exalted.webp' }
+    { label: 'Divine Orb', src: IMAGES.divine },
+    { label: 'Chaos Orb', src: IMAGES.chaos },
+    { label: 'Mirror of Kalandra', src: IMAGES.mirror },
+    { label: 'Exalted Orb', src: IMAGES.exalted }
   ];
 
-  // Maneja la subida de un archivo desde el computador (conversión a Base64)
+  // Maneja la selección de archivo y genera la vista previa
   const handleFileChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -28,12 +32,12 @@ export function ProductManager({ products = [], onAddProduct, onDeleteProduct })
       return;
     }
 
-    // Límite práctico para localStorage (~1.5 MB)
-    if (file.size > 1.5 * 1024 * 1024) {
-      setMessage({ text: 'La imagen es muy pesada. Elige una menor a 1.5 MB.', type: 'error' });
+    if (file.size > 10 * 1024 * 1024) {
+      setMessage({ text: 'La imagen es muy pesada. Elige una menor a 10 MB.', type: 'error' });
       return;
     }
 
+    setImageFile(file);
     const reader = new FileReader();
     reader.onload = (event) => {
       setImagePreview(event.target.result);
@@ -45,11 +49,25 @@ export function ProductManager({ products = [], onAddProduct, onDeleteProduct })
     e.preventDefault();
     setMessage({ text: '', type: '' });
 
-    const finalSrc = imageMode === 'upload' ? imagePreview : selectedPreset;
+    let finalSrc = selectedPreset;
 
-    if (imageMode === 'upload' && !imagePreview) {
-      setMessage({ text: 'Debes seleccionar una imagen desde tu archivo.', type: 'error' });
-      return;
+    if (imageMode === 'upload') {
+      if (!imageFile && !imagePreview) {
+        setMessage({ text: 'Debes seleccionar una imagen desde tu archivo.', type: 'error' });
+        return;
+      }
+
+      try {
+        setIsUploading(true);
+        setMessage({ text: 'Subiendo imagen a ImgBB...', type: 'info' });
+        finalSrc = await uploadImageToImgBB(imageFile);
+      } catch (uploadError) {
+        setIsUploading(false);
+        setMessage({ text: `Error al subir a ImgBB: ${uploadError.message}`, type: 'error' });
+        return;
+      } finally {
+        setIsUploading(false);
+      }
     }
 
     const res = await onAddProduct({ name, price, src: finalSrc });
@@ -57,6 +75,7 @@ export function ProductManager({ products = [], onAddProduct, onDeleteProduct })
       setMessage({ text: res.message, type: 'success' });
       setName('');
       setPrice('');
+      setImageFile(null);
       setImagePreview('');
     } else {
       setMessage({ text: res?.message || 'Error al agregar producto', type: 'error' });
@@ -172,8 +191,8 @@ export function ProductManager({ products = [], onAddProduct, onDeleteProduct })
         </div>
 
         <div className="pt-2">
-          <Button type="submit" className="btn-gold text-sm px-6">
-            + Agregar a Tienda
+          <Button type="submit" className="btn-gold text-sm px-6" disabled={isUploading}>
+            {isUploading ? 'Subiendo imagen...' : '+ Agregar a Tienda'}
           </Button>
         </div>
       </form>
@@ -186,6 +205,7 @@ export function ProductManager({ products = [], onAddProduct, onDeleteProduct })
               <th className="pb-3 px-2">Vista previa</th>
               <th className="pb-3 px-2">Nombre</th>
               <th className="pb-3 px-2">Precio</th>
+              <th className="pb-3 px-2">Stock</th>
               <th className="pb-3 px-2 text-right">Acción</th>
             </tr>
           </thead>
@@ -197,6 +217,26 @@ export function ProductManager({ products = [], onAddProduct, onDeleteProduct })
                 </td>
                 <td className="py-2 px-2 font-medium text-white">{item.name}</td>
                 <td className="py-2 px-2 text-[#e5c285]">{item.price}</td>
+                <td className="py-2 px-2 text-gray-300">
+                  <div className="flex items-center gap-2">
+                    <span>{item.stock ?? 100}</span>
+                    {onUpdateStock && item.id && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = window.prompt(`Nuevo stock para ${item.name}:`, item.stock ?? 100);
+                          if (val !== null && !isNaN(parseInt(val, 10))) {
+                            onUpdateStock(item.id, parseInt(val, 10));
+                          }
+                        }}
+                        className="text-xs text-[#ceaa7b] hover:underline"
+                        title="Editar stock"
+                      >
+                        ✏️
+                      </button>
+                    )}
+                  </div>
+                </td>
                 <td className="py-2 px-2 text-right">
                   <Button
                     className="btn-danger text-xs py-1 px-3"

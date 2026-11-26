@@ -1,4 +1,5 @@
 import { AboutTemplate } from '../components/templates/AboutTemplate';
+import { IMAGES } from '../constants/images';
 
 const aboutTitles = [
   { variant: "h1", content: "Quiénes Somos", className: "titulo-principal" },
@@ -7,12 +8,12 @@ const aboutTitles = [
 
 const aboutIntros = [
   {
-    src: '/images/elder.webp',
+    src: IMAGES.elder,
     alt: "Nuestra Misión y Origen",
     content: "Nacimos como una iniciativa de jugadores experimentados de Path of Exile cansados de las estafas y las demoras en el comercio informal. Nuestra misión es brindar una plataforma segura, ágil y transparente donde cada exiliado pueda intercambiar orbes y divisas con total confianza."
   },
   {
-    src: '/images/shaper.webp',
+    src: IMAGES.shaper,
     alt: "Compromiso con la Comunidad",
     content: "Creemos en la transparencia y el juego limpio. Monitoreamos constantemente las tasas de cambio de la liga para garantizar valores justos y proporcionamos soporte continuo para que tu única preocupación sea conquistar el Atlas.",
     className: "reverse"
@@ -21,19 +22,19 @@ const aboutIntros = [
 
 const aboutTeam = [
   {
-    src: '/images/miembro1.webp',
+    src: IMAGES.team1,
     alt: "Web Developer",
     title: "Cristian",
     description: "Fundador & Arquitectura Web"
   },
   {
-    src: '/images/miembro2.webp',
+    src: IMAGES.team2,
     alt: "Chaos Trader",
     title: "Christian",
     description: "Analista de Mercado y Tasas de Cambio"
   },
   {
-    src: '/images/miembro3.webp',
+    src: IMAGES.team3,
     alt: "Divine Guardian",
     title: "Benjamin Netanyahu",
     description: "Seguridad y Soporte a la Comunidad"

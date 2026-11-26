@@ -13,7 +13,7 @@ function saveLocalOrders(orders) {
   localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
 }
 
-// Realizar Checkout: POST /api/v1/orders/checkout/{userId}
+// Realizar Checkout: sincroniza el carrito con el backend si es necesario y ejecuta checkout
 export async function checkoutOrder(user, cartItems = []) {
   if (!user) {
     return { ok: false, message: 'Debes iniciar sesión para completar la compra.' };
@@ -23,6 +23,20 @@ export async function checkoutOrder(user, cartItems = []) {
 
   if (userId) {
     try {
+      // 1. Asegurar que los ítems del carrito estén en el carrito del backend
+      for (const item of cartItems) {
+        if (item.id) {
+          await apiRequest(`/api/v1/cart/${userId}/items`, {
+            method: 'POST',
+            body: JSON.stringify({
+              productId: item.id,
+              quantity: item.qty || 1
+            })
+          }).catch((err) => console.warn('Sync item error:', err.message));
+        }
+      }
+
+      // 2. Ejecutar el checkout de la orden
       const order = await apiRequest(`/api/v1/orders/checkout/${userId}`, {
         method: 'POST'
       });

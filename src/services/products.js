@@ -1,12 +1,13 @@
 import { apiRequest } from './api';
+import { IMAGES } from '../constants/images';
 
 const PRODUCTS_KEY = "poe_products";
 
 export const defaultProducts = [
-  { id: 1, name: "Divine Orb", price: "$2.00 USD", src: "/images/divine.webp", alt: "Divine Orb", stock: 500 },
-  { id: 2, name: "Chaos Orb", price: "$0.15 USD", src: "/images/chaos.webp", alt: "Chaos Orb", stock: 1000 },
-  { id: 3, name: "Mirror of Kalandra", price: "$250.00 USD", src: "/images/mirror.webp", alt: "Mirror of Kalandra", stock: 10 },
-  { id: 4, name: "Exalted Orb", price: "$0.50 USD", src: "/images/exalted.webp", alt: "Exalted Orb", stock: 800 }
+  { id: 1, name: "Divine Orb", price: "$2.00 USD", src: IMAGES.divine, alt: "Divine Orb", stock: 500 },
+  { id: 2, name: "Chaos Orb", price: "$0.15 USD", src: IMAGES.chaos, alt: "Chaos Orb", stock: 1000 },
+  { id: 3, name: "Mirror of Kalandra", price: "$250.00 USD", src: IMAGES.mirror, alt: "Mirror of Kalandra", stock: 10 },
+  { id: 4, name: "Exalted Orb", price: "$0.50 USD", src: IMAGES.exalted, alt: "Exalted Orb", stock: 800 }
 ];
 
 export async function getProducts() {
@@ -19,7 +20,7 @@ export async function getProducts() {
         name: p.name,
         price: typeof p.price === 'number' ? `$${p.price.toFixed(2)} USD` : p.price,
         numericPrice: typeof p.price === 'number' ? p.price : parseFloat(String(p.price).replace(/[^0-9.]/g, '')),
-        src: p.imageUrl || '/images/divine.webp',
+        src: p.imageUrl || IMAGES.divine,
         alt: p.altText || p.name,
         stock: p.stock
       }));
@@ -46,7 +47,7 @@ export async function getProducts() {
 export async function addProduct({ name = '', price = '', src = '', alt = '', stock = 100 }) {
   const cleanName = name.trim();
   const cleanPrice = String(price).trim();
-  const cleanSrc = src.trim() || '/images/divine.webp';
+  const cleanSrc = src.trim() || IMAGES.divine;
   const cleanAlt = alt.trim() || cleanName;
   const numPrice = parseFloat(cleanPrice.replace('$', '').replace('USD', '').trim());
 
@@ -84,6 +85,17 @@ export async function addProduct({ name = '', price = '', src = '', alt = '', st
     products.push(newProduct);
     localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
     return { ok: true, message: 'Producto agregado exitosamente (modo local).', product: newProduct };
+  }
+}
+
+export async function updateProductStock(id, quantity) {
+  try {
+    const updated = await apiRequest(`/api/v1/products/${id}/stock?quantity=${quantity}`, {
+      method: 'PATCH',
+    });
+    return { ok: true, message: 'Stock actualizado con éxito.', product: updated };
+  } catch (error) {
+    return { ok: false, message: error.message };
   }
 }
 
