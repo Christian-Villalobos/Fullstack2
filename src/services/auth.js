@@ -27,34 +27,42 @@ export function logoutUser() {
   localStorage.removeItem(CURRENT_USER_KEY);
 }
 
-// Iniciar sesión (con Backend y fallback)
+// Indica si un usuario es administrador (acepta 'ROLE_ADMIN' y 'admin')
+export function isAdminUser(user) {
+  return Boolean(user && (user.role === 'ROLE_ADMIN' || user.role === 'admin'));
+}
+
+// Iniciar sesión (con Backend y fallback solo si no hay conexión)
 export async function loginUser({ email = '', password = '' }) {
   const cleanEmail = email.trim().toLowerCase();
-  
+
   try {
     const user = await apiRequest('/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email: cleanEmail, password })
     });
-
     if (user) {
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
       return { ok: true, user };
     }
+    return { ok: false, message: 'Correo o contraseña incorrectos.' };
   } catch (error) {
-    console.warn('Backend login error or offline. Checking fallback...', error.message);
-    // Fallback a localStorage si el backend no está disponible o falla
+    // El backend respondió 4xx: credenciales inválidas, NO hay fallback
+    if (error.status && error.status < 500) {
+      return { ok: false, message: error.message || 'Correo o contraseña incorrectos.' };
+    }
+    // Sin red o 5xx: fallback local
+    console.warn('Backend offline, usando fallback local...', error.message);
     const localUser = getUsers().find(u => u.email === cleanEmail && u.password === password);
     if (localUser) {
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(localUser));
       return { ok: true, user: localUser };
     }
-    return { ok: false, message: error.message || 'Correo o contraseña incorrectos.' };
+    return { ok: false, message: 'No se pudo conectar con el servidor.' };
   }
-  return { ok: false, message: 'Correo o contraseña incorrectos.' };
 }
 
-// Registrar usuario (con Backend y fallback)
+// Registrar usuario (con Backend y fallback solo si no hay conexión)
 export async function registerUser({ name = '', email = '', password = '' }) {
   const cleanName = name.trim();
   const cleanEmail = email.trim().toLowerCase();
@@ -70,6 +78,11 @@ export async function registerUser({ name = '', email = '', password = '' }) {
     });
     return { ok: true, message: '¡Registro exitoso! Ya puedes iniciar sesión.', user };
   } catch (error) {
+    // El backend respondió 4xx (ej. correo duplicado): mostrar su mensaje, sin fallback
+    if (error.status && error.status < 500) {
+      return { ok: false, message: error.message };
+    }
+
     console.warn('Backend register error, trying fallback...', error.message);
     const users = getUsers();
     if (users.some(u => u.email === cleanEmail)) {
@@ -95,8 +108,13 @@ export async function resetPassword(email = '', newPassword = '') {
       method: 'POST',
       body: JSON.stringify({ email: cleanEmail, newPassword })
     });
-    return { ok: true, message: res.message || 'Contraseña restablecida con éxito' };
+    return { ok: true, message: res?.message || 'Contraseña restablecida con éxito' };
   } catch (error) {
+    // El backend respondió 4xx (ej. correo no existe): mostrar su mensaje, sin fallback
+    if (error.status && error.status < 500) {
+      return { ok: false, message: error.message };
+    }
+
     console.warn('Backend resetPassword error, trying fallback...', error.message);
     const users = getUsers();
     const userIndex = users.findIndex(u => u.email === cleanEmail);
@@ -124,7 +142,7 @@ export async function changePassword(user, currentPassword, newPassword) {
         method: 'PATCH',
         body: JSON.stringify({ currentPassword, newPassword })
       });
-      return { ok: true, message: res.message || 'Contraseña actualizada exitosamente.' };
+      return { ok: true, message: res?.message || 'Contraseña actualizada exitosamente.' };
     } catch (error) {
       return { ok: false, message: error.message };
     }
@@ -179,7 +197,7 @@ export async function updateProfile(user, { name = '' }) {
 export function deleteUser(email) {
   const users = getUsers();
   const userToDelete = users.find(u => u.email === email);
-  if (!userToDelete || userToDelete.role === 'ROLE_ADMIN' || userToDelete.role === 'admin') {
+  if (!userToDelete || isAdminUser(userToDelete)) {
     return { ok: false, message: 'No se puede eliminar este usuario.' };
   }
   const updatedUsers = users.filter(u => u.email !== email);

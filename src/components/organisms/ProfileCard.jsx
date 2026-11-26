@@ -1,10 +1,11 @@
 import { Text } from '../atoms/Text';
+import { isAdminUser } from '../../services/auth'; 
 
 // Organismo: tarjeta con los datos del usuario que inició sesión
 // user: { name, email, role }
 export function ProfileCard({ user }) {
     // true si el usuario es administrador (compatible con 'admin' y 'ROLE_ADMIN')
-    const isAdmin = user.role === 'admin' || user.role === 'ROLE_ADMIN';
+    const isAdmin = isAdminUser(user);
 
     return (
         <div className="profile-card">

@@ -6,6 +6,7 @@ import { ContactRequestList } from '../organisms/ContactRequestList';
 import { OrderList } from '../organisms/OrderList';
 import { Footer } from '../organisms/Footer';
 import { Button } from '../atoms/Button';
+import { isAdminUser } from '../../services/auth';
 
 export function ProfileTemplate({
     navbar,
@@ -20,7 +21,7 @@ export function ProfileTemplate({
     onUpdateOrderStatus,
     footer
 }) {
-    const isAdmin = user.role === 'admin' || user.role === 'ROLE_ADMIN';
+    const isAdmin = isAdminUser(user);
 
     return (
         <div className="profile-template">

@@ -1,5 +1,6 @@
 import { Text } from '../atoms/Text';
-import { Button } from '../atoms/Button'; // NUEVO
+import { Button } from '../atoms/Button';
+import { isAdminUser } from '../../services/auth';
 
 // Organismo: tabla con todos los usuarios registrados (solo la ve el admin)
 // users: [{ name, email, role }, ...]
@@ -31,7 +32,7 @@ export function UserList({ users = [], onDelete }) {
                             {/* NUEVO: los administradores no se pueden eliminar, por eso solo
                                 mostramos un guion. Los demás tienen su botón Eliminar */}
                             <td>
-                                {user.role === 'admin' ? (
+                                {isAdminUser(user) ? (
                                     '—'
                                 ) : (
                                     <Button className="btn-danger" onClick={() => onDelete(user.email)}>
