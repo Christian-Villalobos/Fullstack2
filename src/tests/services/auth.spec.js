@@ -4,8 +4,6 @@ import {
   loginUser,
   getCurrentUser,
   logoutUser,
-  deleteUser,
-  updateProfile,
   changePassword,
   resetPassword
 } from '../../services/auth';
