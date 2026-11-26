@@ -1,4 +1,5 @@
 import { HomeTemplate } from '../components/templates/HomeTemplate';
+import { IMAGES } from '../constants/images';
 
 const defaultTitles = [
   { variant: "h1", content: "Path of Exile - Currency Exchange", className: "titulo-principal" },
@@ -6,19 +7,19 @@ const defaultTitles = [
 ];
 
 const defaultLogo = {
-  src: '/images/logo.webp',
+  src: IMAGES.logo,
   alt: "Logo Path of Exile",
   className: "logo"
 };
 
 const defaultIntros = [
   {
-    src: '/images/poe2-soldier.webp',
+    src: IMAGES.poe2Soldier,
     alt: "Mercado de divisas Path of Exile",
     content: "Bienvenido a la plataforma de intercambio de divisas para Path of Exile. Encuentra Divine Orbs, Chaos Orbs, Mirror of Kalandra y comercia directamente con otros jugadores con máxima confianza."
   },
   {
-    src: '/images/pathfinder.webp',
+    src: IMAGES.pathfinder,
     alt: "Compra segura",
     content: "Todas las transacciones son rápidas y seguras. Compra y vende sin complicaciones con soporte 24/7.",
     className: "reverse"

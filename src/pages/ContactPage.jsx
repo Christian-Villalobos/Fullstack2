@@ -1,5 +1,6 @@
 import { ContactTemplate } from '../components/templates/ContactTemplate';
 import { saveContactMessage } from '../services/contact';
+import { IMAGES } from '../constants/images';
 
 const contactTitles = [
   { variant: "h1", content: "Contacto y Soporte", className: "titulo-principal" },
@@ -8,13 +9,13 @@ const contactTitles = [
 
 const contactCards = [
   {
-    src: '/images/poe2-soldier.webp',
+    src: IMAGES.poe2Soldier,
     alt: 'Soporte 24/7',
     title: 'Soporte 24/7',
     description: 'Atención personalizada para que tus orbes lleguen a salvo y a tiempo a tu alijo.'
   },
   {
-    src: '/images/Path-of-Exile-Logo.webp',
+    src: IMAGES.poeLogo,
     alt: 'Comunidad Oficial',
     title: 'Comunidad Oficial',
     description: 'Únete a nuestra comunidad para verificar cotizaciones y reputación en tiempo real.'

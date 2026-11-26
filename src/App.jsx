@@ -15,6 +15,7 @@ import { ManageProductsPage } from './pages/ManageProductsPage';
 import { getCurrentUser, logoutUser, isAdminUser } from './services/auth';
 import { getLocalCart, saveLocalCart } from './services/cart';
 import { checkoutOrder } from './services/orders';
+import { IMAGES } from './constants/images';
 
 // Estilos globales y modulares
 import './styles/global.css';
@@ -168,7 +169,7 @@ function App() {
 
   const navbarData = {
     logo: {
-      src: '/images/logo.webp',
+      src: IMAGES.logo,
       alt: 'Logo del sitio',
       className: 'navbar-logo',
     },
@@ -213,7 +214,9 @@ function App() {
       {currentPage === 'privacy' && <PrivacyPage navbar={navbarData} footer={footerData} />}
       {currentPage === 'terms' && <TermsPage navbar={navbarData} footer={footerData} />}
       {currentPage === 'register' && <RegisterPage navbar={navbarData} footer={footerData} />}
-      {currentPage === 'login' && <LoginPage navbar={navbarData} footer={footerData} />}
+      {currentPage === 'login' && (
+        <LoginPage navbar={navbarData} footer={footerData} onLoginSuccess={(u) => setCurrentUser(u)} />
+      )}
       {currentPage === 'profile' && <ProfilePage navbar={navbarData} footer={footerData} />}
       {currentPage === 'edit-profile' && (
         <EditProfilePage navbar={navbarData} footer={footerData} onUserUpdated={(u) => setCurrentUser(u)} />

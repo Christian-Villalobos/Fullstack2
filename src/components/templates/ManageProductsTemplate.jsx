@@ -9,6 +9,7 @@ export function ManageProductsTemplate({
   products = [],
   onAddProduct,
   onDeleteProduct,
+  onUpdateStock,
   footer
 }) {
   return (
@@ -35,6 +36,7 @@ export function ManageProductsTemplate({
           products={products}
           onAddProduct={onAddProduct}
           onDeleteProduct={onDeleteProduct}
+          onUpdateStock={onUpdateStock}
         />
       </div>
 
