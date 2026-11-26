@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { ManageProductsTemplate } from '../components/templates/ManageProductsTemplate';
-import { getCurrentUser } from '../services/auth';
+import { getCurrentUser, isAdminUser } from '../services/auth';
 import { getProducts, addProduct, deleteProduct, defaultProducts } from '../services/products';
 
 export function ManageProductsPage({ navbar, footer }) {
-  const user = getCurrentUser();
-  const isAdmin = user && (user.role === 'admin' || user.role === 'ROLE_ADMIN');
+  // Se lee una sola vez: así el objeto no cambia en cada render
+  const [user] = useState(getCurrentUser);
+  const isAdmin = isAdminUser(user);
   const [products, setProducts] = useState(defaultProducts);
 
   const loadProducts = async () => {
@@ -19,7 +20,12 @@ export function ManageProductsPage({ navbar, footer }) {
       window.location.hash = '#inicio';
       return;
     }
-    loadProducts();
+
+    let isMounted = true;
+    getProducts().then((data) => {
+      if (isMounted && data) setProducts(data);
+    });
+    return () => { isMounted = false; };
   }, [user, isAdmin]);
 
   if (!user || !isAdmin) {
