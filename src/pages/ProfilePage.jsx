@@ -1,21 +1,22 @@
 import { useEffect, useState } from 'react';
 import { ProfileTemplate } from '../components/templates/ProfileTemplate';
-import { getCurrentUser, getUsers, deleteUser } from '../services/auth';
+import { getCurrentUser, fetchUsers, deleteUser, isAdminUser } from '../services/auth';
 import { getContactMessages, toggleMessageStatus, deleteContactMessage } from '../services/contact';
 import { getUserOrders, getAllOrders, updateOrderStatus } from '../services/orders';
 
 export function ProfilePage({ navbar, footer }) {
-    const user = getCurrentUser();
-    const isAdmin = user && (user.role === 'admin' || user.role === 'ROLE_ADMIN');
+    // Se lee una sola vez: así el objeto no cambia en cada render
+    const [user] = useState(getCurrentUser);
+    const isAdmin = isAdminUser(user);
 
-    const [users, setUsers] = useState(() => (isAdmin ? getUsers() : []));
+    const [users, setUsers] = useState([]);
     const [contactMessages, setContactMessages] = useState([]);
     const [orders, setOrders] = useState([]);
 
     const loadOrders = async () => {
         if (!user) return;
         const data = isAdmin ? await getAllOrders() : await getUserOrders(user);
-        if (data) setOrders(data);
+        setOrders(data);
     };
 
     useEffect(() => {
@@ -24,36 +25,42 @@ export function ProfilePage({ navbar, footer }) {
             return;
         }
 
-        loadOrders();
+        let isMounted = true;
+
+        (async () => {
+            const data = isAdmin ? await getAllOrders() : await getUserOrders(user);
+            if (isMounted) setOrders(data);
+        })();
 
         if (isAdmin) {
-            let isMounted = true;
-            getContactMessages().then(msgs => {
+            fetchUsers().then((list) => {
+                if (isMounted) setUsers(list);
+            });
+            getContactMessages().then((msgs) => {
                 if (isMounted) setContactMessages(msgs);
             });
-            return () => { isMounted = false; };
         }
+
+        return () => { isMounted = false; };
     }, [user, isAdmin]);
 
     if (!user) {
         return null;
     }
 
-    const handleDeleteUser = (email) => {
+    const handleDeleteUser = async (email) => {
         if (!isAdmin) return;
         const confirmed = window.confirm(`¿Seguro que quieres eliminar a ${email}?`);
         if (!confirmed) return;
 
-        const result = deleteUser(email);
+        const result = await deleteUser(email);
         alert(result.message);
-        setUsers(getUsers());
+        if (result.ok) setUsers(await fetchUsers());
     };
 
     const handleToggleContactStatus = async (id) => {
         const res = await toggleMessageStatus(id);
-        if (res.ok) {
-            setContactMessages(res.messages);
-        }
+        if (res.ok) setContactMessages(res.messages);
     };
 
     const handleDeleteContactMessage = async (id) => {
@@ -61,25 +68,25 @@ export function ProfilePage({ navbar, footer }) {
         if (!confirmed) return;
 
         const res = await deleteContactMessage(id);
-        if (res.ok) {
-            setContactMessages(res.messages);
-        }
+        if (res.ok) setContactMessages(res.messages);
     };
 
     const handleUpdateOrderStatus = async (orderId, newStatus) => {
         const res = await updateOrderStatus(orderId, newStatus);
         if (res.ok) {
             await loadOrders();
+        } else {
+            alert(res.message);
         }
     };
 
     const titles = [
         {
-            variant: "h1",
+            variant: 'h1',
             content: isAdmin ? 'Panel de Administrador' : 'Mi Perfil',
-            className: "titulo-principal"
+            className: 'titulo-principal',
         },
-        { variant: "p", content: `Bienvenido, ${user.name}`, className: "subtitulo" }
+        { variant: 'p', content: `Bienvenido, ${user.name}`, className: 'subtitulo' },
     ];
 
     return (

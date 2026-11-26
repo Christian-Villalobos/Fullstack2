@@ -11,7 +11,7 @@ export function ForgotPasswordTemplate({ navbar, onSubmit, footer }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [msg, setMsg] = useState({ text: '', type: '' });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMsg({ text: '', type: '' });
 
@@ -20,7 +20,7 @@ export function ForgotPasswordTemplate({ navbar, onSubmit, footer }) {
       return;
     }
 
-    const res = onSubmit({ email, newPassword });
+    const res = await onSubmit({ email, newPassword });
     setMsg({ text: res.message, type: res.ok ? 'success' : 'error' });
 
     if (res.ok) {
@@ -39,8 +39,8 @@ export function ForgotPasswordTemplate({ navbar, onSubmit, footer }) {
 
       <Texts
         texts={[
-          { variant: "h1", content: "Recuperar Contraseña", className: "titulo-principal" },
-          { variant: "p", content: "Ingresa tu correo y define una nueva contraseña", className: "subtitulo" }
+          { variant: 'h1', content: 'Recuperar Contraseña', className: 'titulo-principal' },
+          { variant: 'p', content: 'Ingresa tu correo y define una nueva contraseña', className: 'subtitulo' },
         ]}
       />
 
@@ -53,7 +53,7 @@ export function ForgotPasswordTemplate({ navbar, onSubmit, footer }) {
               fontSize: '0.85rem',
               backgroundColor: msg.type === 'success' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
               color: msg.type === 'success' ? '#4ade80' : '#f87171',
-              border: `1px solid ${msg.type === 'success' ? '#22c55e' : '#ef4444'}`
+              border: `1px solid ${msg.type === 'success' ? '#22c55e' : '#ef4444'}`,
             }}
           >
             {msg.text}
@@ -74,7 +74,7 @@ export function ForgotPasswordTemplate({ navbar, onSubmit, footer }) {
           label="Nueva Contraseña"
           type="password"
           name="newPassword"
-          placeholder="Mínimo 4 caracteres"
+          placeholder="Mínimo 6 caracteres"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           required
@@ -101,7 +101,7 @@ export function ForgotPasswordTemplate({ navbar, onSubmit, footer }) {
               color: '#d6a85f',
               fontSize: '0.85rem',
               textDecoration: 'underline',
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             ← Volver a Iniciar Sesión
