@@ -1,6 +1,6 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ProfilePage } from '../../pages/ProfilePage';
-import { loginUser, registerUser, getUsers } from '../../services/auth';
+import { api } from '../../services/api';
 
 describe('ProfilePage', () => {
   beforeEach(() => {
@@ -8,42 +8,73 @@ describe('ProfilePage', () => {
     window.location.hash = '';
   });
 
-  it('un usuario normal ve su perfil pero no la lista de usuarios', () => {
-    registerUser({ name: 'Ana', email: 'ana@mail.com', password: '123' });
-    loginUser({ email: 'ana@mail.com', password: '123' });
+  it('un usuario normal ve su perfil pero no la lista de usuarios', async () => {
+    localStorage.setItem('poe_current_user', JSON.stringify({ id: 2, name: 'Ana', email: 'ana@mail.com', role: 'ROLE_USER' }));
+    spyOn(api, 'request').and.resolveTo({ data: [] });
 
     render(<ProfilePage navbar={{}} />);
 
-    expect(screen.getByText('Mi Perfil')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('Mi Perfil')).toBeTruthy();
+    });
     expect(screen.queryByText(/Usuarios registrados/)).toBeNull();
   });
 
-  it('el administrador ve el panel y puede eliminar usuarios', () => {
-    registerUser({ name: 'Ana', email: 'ana@mail.com', password: '123' });
-    loginUser({ email: 'admin@poe.com', password: 'admin123' });
+  it('el administrador ve el panel y puede eliminar usuarios', async () => {
+    localStorage.setItem('poe_current_user', JSON.stringify({ id: 1, name: 'Admin', email: 'admin@poe.com', role: 'ROLE_ADMIN' }));
+    const initialUsers = [
+      { id: 1, name: 'Admin', email: 'admin@poe.com', role: 'ROLE_ADMIN' },
+      { id: 2, name: 'Ana', email: 'ana@mail.com', role: 'ROLE_USER' },
+    ];
+    let usersList = [...initialUsers];
+
+    spyOn(api, 'request').and.callFake(async ({ url, method }) => {
+      if (url === '/api/v1/users' && (!method || method === 'GET')) return { data: usersList };
+      if (url === '/api/v1/users/2' && method === 'DELETE') {
+        usersList = usersList.filter((u) => u.id !== 2);
+        return { data: { message: 'Usuario eliminado correctamente' } };
+      }
+      return { data: [] };
+    });
     spyOn(window, 'confirm').and.returnValue(true);
     spyOn(window, 'alert');
 
     render(<ProfilePage navbar={{}} />);
 
-    expect(screen.getByText('Panel de Administrador')).toBeTruthy();
-    expect(screen.getByText('Usuarios registrados (2)')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('Panel de Administrador')).toBeTruthy();
+      expect(screen.getByText('Usuarios registrados (2)')).toBeTruthy();
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
 
-    expect(getUsers().length).toBe(1);
-    expect(screen.getByText('Usuarios registrados (1)')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('Usuarios registrados (1)')).toBeTruthy();
+    });
   });
 
-  it('no elimina nada si el administrador cancela la confirmación', () => {
-    registerUser({ name: 'Ana', email: 'ana@mail.com', password: '123' });
-    loginUser({ email: 'admin@poe.com', password: 'admin123' });
+  it('no elimina nada si el administrador cancela la confirmación', async () => {
+    localStorage.setItem('poe_current_user', JSON.stringify({ id: 1, name: 'Admin', email: 'admin@poe.com', role: 'ROLE_ADMIN' }));
+    const spy = spyOn(api, 'request').and.callFake(async ({ url }) => {
+      if (url === '/api/v1/users') {
+        return {
+          data: [
+            { id: 1, name: 'Admin', email: 'admin@poe.com', role: 'ROLE_ADMIN' },
+            { id: 2, name: 'Ana', email: 'ana@mail.com', role: 'ROLE_USER' },
+          ],
+        };
+      }
+      return { data: [] };
+    });
     spyOn(window, 'confirm').and.returnValue(false);
 
     render(<ProfilePage navbar={{}} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+    await waitFor(() => {
+      expect(screen.getByText('Usuarios registrados (2)')).toBeTruthy();
+    });
 
-    expect(getUsers().length).toBe(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+    expect(spy).not.toHaveBeenCalledWith(jasmine.objectContaining({ method: 'DELETE' }));
   });
 
   it('sin sesión redirige al login y no muestra nada', () => {

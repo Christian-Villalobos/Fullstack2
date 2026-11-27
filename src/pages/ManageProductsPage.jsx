@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { ManageProductsTemplate } from '../components/templates/ManageProductsTemplate';
 import { getCurrentUser, isAdminUser } from '../services/auth';
-import { getProducts, addProduct, deleteProduct, updateProductStock, defaultProducts } from '../services/products';
+import { getProducts, addProduct, deleteProduct, updateProductStock } from '../services/products';
 
 export function ManageProductsPage({ navbar, footer }) {
   // Se lee una sola vez: así el objeto no cambia en cada render
   const [user] = useState(getCurrentUser);
   const isAdmin = isAdminUser(user);
-  const [products, setProducts] = useState(defaultProducts);
+  const [products, setProducts] = useState([]);
 
   const loadProducts = async () => {
     const data = await getProducts();

@@ -1,6 +1,6 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { RegisterPage } from '../../pages/RegisterPage';
-import { getUsers } from '../../services/auth';
+import { api } from '../../services/api';
 
 describe('RegisterPage', () => {
   beforeEach(() => {
@@ -15,22 +15,27 @@ describe('RegisterPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Registrarse' }));
   }
 
-  it('registra al usuario y redirige al login', () => {
+  it('registra al usuario vía API y redirige al login', async () => {
+    spyOn(api, 'request').and.resolveTo({ data: { id: 2, name: 'Ana', email: 'ana@mail.com', role: 'ROLE_USER' } });
     spyOn(window, 'alert');
     render(<RegisterPage navbar={{}} />);
 
-    llenarFormulario('Ana', 'ana@mail.com', '123');
+    llenarFormulario('Ana', 'ana@mail.com', '1234');
 
-    expect(getUsers().some(u => u.email === 'ana@mail.com')).toBeTrue();
-    expect(window.location.hash).toBe('#login');
+    await waitFor(() => {
+      expect(window.location.hash).toBe('#login');
+    });
   });
 
-  it('no redirige si el correo ya está registrado', () => {
+  it('no redirige si el correo ya está registrado', async () => {
+    spyOn(api, 'request').and.rejectWith(new Error('El correo ya está registrado.'));
     spyOn(window, 'alert');
     render(<RegisterPage navbar={{}} />);
-    llenarFormulario('Ana', 'admin@poe.com', '123');
+    llenarFormulario('Ana', 'admin@poe.com', '1234');
 
-    expect(window.alert).toHaveBeenCalledWith('El correo ya está registrado.');
+    await waitFor(() => {
+      expect(window.alert).toHaveBeenCalledWith('El correo ya está registrado.');
+    });
     expect(window.location.hash).not.toBe('#login');
   });
 });

@@ -1,71 +1,96 @@
 import { apiRequest } from './api';
 import { IMAGES } from '../constants/images';
 
-const CART_KEY = "poe_cart";
+function mapCartResponse(data) {
+  if (!data || !Array.isArray(data.items)) return [];
 
-// Devuelve el carrito guardado localmente
-export function getLocalCart() {
-  const saved = localStorage.getItem(CART_KEY);
-  return saved ? JSON.parse(saved) : [];
+  return data.items.map((item) => ({
+    id: item.productId,
+    itemId: item.id,
+    name: item.productName,
+    price: `$${Number(item.unitPrice).toFixed(2)} USD`,
+    numericPrice: Number(item.unitPrice),
+    qty: item.quantity,
+    subtotal: Number(item.subtotal),
+    src: item.imageUrl || IMAGES.divine,
+    alt: item.productName,
+  }));
 }
 
-// Guarda el carrito localmente
-export function saveLocalCart(cart) {
-  localStorage.setItem(CART_KEY, JSON.stringify(cart));
-}
-
-// Obtener carrito del usuario (Backend con fallback a local)
+// Obtener carrito del usuario (100% API)
 export async function getCart(userId) {
-  if (userId) {
-    try {
-      const data = await apiRequest(`/api/v1/cart/${userId}`);
-      if (data && Array.isArray(data.items)) {
-        const mapped = data.items.map(item => ({
-          id: item.productId,
-          itemId: item.id,
-          name: item.productName,
-          price: `$${item.unitPrice.toFixed(2)} USD`,
-          qty: item.quantity,
-          src: item.imageUrl || IMAGES.divine,
-          alt: item.productName
-        }));
-        saveLocalCart(mapped);
-        return mapped;
-      }
-    } catch (error) {
-      console.warn('Backend cart inaccesible, usando local...', error.message);
-    }
-  }
-  return getLocalCart();
-}
+  if (!userId) return [];
 
-// Sincronizar item agregado al carrito
-export async function syncAddToCart(userId, product, quantity = 1) {
-  if (userId && product.id) {
-    try {
-      await apiRequest(`/api/v1/cart/${userId}/items`, {
-        method: 'POST',
-        body: JSON.stringify({
-          productId: product.id,
-          quantity: quantity
-        })
-      });
-    } catch (error) {
-      console.warn('Backend syncAddToCart falló...', error.message);
-    }
+  try {
+    const data = await apiRequest(`/api/v1/cart/${userId}`);
+    return mapCartResponse(data);
+  } catch (error) {
+    console.error('Error al obtener carrito:', error.message);
+    return [];
   }
 }
 
-// Vaciar carrito
-export async function syncClearCart(userId) {
-  if (userId) {
-    try {
-      await apiRequest(`/api/v1/cart/${userId}`, {
-        method: 'DELETE'
-      });
-    } catch (error) {
-      console.warn('Backend syncClearCart falló...', error.message);
-    }
+// Agregar producto al carrito (100% API)
+export async function addCartItem(userId, productId, quantity = 1) {
+  if (!userId || !productId) {
+    return { ok: false, message: 'Usuario o producto inválido.' };
   }
-  saveLocalCart([]);
+
+  try {
+    const data = await apiRequest(`/api/v1/cart/${userId}/items`, {
+      method: 'POST',
+      body: JSON.stringify({ productId, quantity }),
+    });
+    return { ok: true, items: mapCartResponse(data) };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+}
+
+// Actualizar cantidad de un ítem del carrito (si quantity <= 0 el backend lo elimina)
+export async function updateCartItemQuantity(userId, itemId, quantity) {
+  if (!userId || !itemId) {
+    return { ok: false, message: 'Usuario o ítem inválido.' };
+  }
+
+  try {
+    const data = await apiRequest(`/api/v1/cart/${userId}/items/${itemId}?quantity=${quantity}`, {
+      method: 'PATCH',
+    });
+    return { ok: true, items: mapCartResponse(data) };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+}
+
+// Quitar un ítem específico del carrito
+export async function removeCartItem(userId, itemId) {
+  if (!userId || !itemId) {
+    return { ok: false, message: 'Usuario o ítem inválido.' };
+  }
+
+  try {
+    const data = await apiRequest(`/api/v1/cart/${userId}/items/${itemId}`, {
+      method: 'DELETE',
+    });
+    return { ok: true, items: mapCartResponse(data) };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+}
+
+// Vaciar carrito completo (100% API)
+export async function clearCartRemote(userId) {
+  if (!userId) {
+    return { ok: false, message: 'Usuario inválido.' };
+  }
+
+  try {
+    const data = await apiRequest(`/api/v1/cart/${userId}`, {
+      method: 'DELETE',
+    });
+    return { ok: true, items: mapCartResponse(data) };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
 }

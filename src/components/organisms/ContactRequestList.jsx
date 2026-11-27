@@ -1,6 +1,21 @@
 import { Text } from '../atoms/Text';
 import { Button } from '../atoms/Button';
 
+const STATUS_CONFIG = {
+  UNREAD: {
+    label: 'No leído',
+    className: 'bg-yellow-900/60 text-yellow-300 border border-yellow-700',
+  },
+  IN_REVIEW: {
+    label: 'En revisión',
+    className: 'bg-blue-900/60 text-blue-300 border border-blue-700',
+  },
+  RESOLVED: {
+    label: 'Resuelto',
+    className: 'bg-green-900/60 text-green-300 border border-green-700',
+  },
+};
+
 export function ContactRequestList({ messages = [], onToggleStatus, onDeleteMessage }) {
   return (
     <div className="bg-[#181614] border border-[#a37938]/40 p-6 rounded-lg shadow-lg mt-8 text-left">
@@ -42,17 +57,21 @@ export function ContactRequestList({ messages = [], onToggleStatus, onDeleteMess
                     <div className="text-xs text-gray-300 truncate">{msg.message}</div>
                   </td>
                   <td className="py-3 px-2">
-                    <span
-                      onClick={() => onToggleStatus(msg.id)}
-                      className={`cursor-pointer inline-block px-2 py-0.5 rounded text-xs font-semibold ${
-                        msg.status === 'Resuelto'
-                          ? 'bg-green-900/60 text-green-300 border border-green-700'
-                          : 'bg-yellow-900/60 text-yellow-300 border border-yellow-700'
-                      }`}
-                      title="Clic para cambiar estado"
-                    >
-                      {msg.status} ↺
-                    </span>
+                    {(() => {
+                      const badge = STATUS_CONFIG[msg.status] || {
+                        label: msg.status,
+                        className: 'bg-yellow-900/60 text-yellow-300 border border-yellow-700',
+                      };
+                      return (
+                        <span
+                          onClick={() => onToggleStatus(msg.id)}
+                          className={`cursor-pointer inline-block px-2 py-0.5 rounded text-xs font-semibold ${badge.className}`}
+                          title="Clic para cambiar estado"
+                        >
+                          {badge.label} ↺
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="py-3 px-2 text-right whitespace-nowrap">
                     <Button

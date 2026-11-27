@@ -13,7 +13,13 @@ import { EditProfilePage } from './pages/EditProfilePage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ManageProductsPage } from './pages/ManageProductsPage';
 import { getCurrentUser, logoutUser, isAdminUser } from './services/auth';
-import { getLocalCart, saveLocalCart } from './services/cart';
+import {
+  getCart,
+  addCartItem,
+  updateCartItemQuantity,
+  removeCartItem,
+  clearCartRemote,
+} from './services/cart';
 import { checkoutOrder } from './services/orders';
 import { IMAGES } from './constants/images';
 
@@ -43,43 +49,69 @@ function App() {
   // ── Sesión ──
   const [currentUser, setCurrentUser] = useState(getCurrentUser);
 
-  // ── Estado del carrito (local; el backend lo crea al hacer checkout) ──
-  const [cart, setCart] = useState(() => (currentUser ? getLocalCart() : []));
+  // ── Estado del carrito (sincronizado con Backend) ──
+  const [cart, setCart] = useState([]);
 
   useEffect(() => {
-    saveLocalCart(cart);
-  }, [cart]);
+    if (!currentUser?.id) return;
 
-  const addToCart = (product) => {
-    if (!currentUser) {
+    let isMounted = true;
+    getCart(currentUser.id).then((items) => {
+      if (isMounted) setCart(items);
+    });
+    return () => { isMounted = false; };
+  }, [currentUser?.id]);
+
+  const activeCart = currentUser?.id ? cart : [];
+
+  const addToCart = async (product) => {
+    if (!currentUser?.id) {
       alert('Debes iniciar sesión para comprar.');
       window.location.hash = '#login';
       return;
     }
 
-    setCart((prev) => {
-      const exists = prev.find((item) => item.name === product.name);
-      if (exists) {
-        return prev.map((item) =>
-          item.name === product.name ? { ...item, qty: item.qty + 1 } : item
-        );
-      }
-      return [...prev, { ...product, qty: 1 }];
-    });
+    const res = await addCartItem(currentUser.id, product.id, 1);
+    if (res.ok) {
+      setCart(res.items);
+    } else {
+      alert(res.message);
+    }
   };
 
-  const removeFromCart = (name) => {
-    setCart((prev) =>
-      prev
-        .map((item) => (item.name === name ? { ...item, qty: item.qty - 1 } : item))
-        .filter((item) => item.qty > 0)
-    );
+  const removeFromCart = async (name) => {
+    if (!currentUser?.id) return;
+    const target = cart.find((item) => item.name === name);
+    if (!target || !target.itemId) return;
+
+    const res =
+      target.qty <= 1
+        ? await removeCartItem(currentUser.id, target.itemId)
+        : await updateCartItemQuantity(currentUser.id, target.itemId, target.qty - 1);
+
+    if (res.ok) {
+      setCart(res.items);
+    } else {
+      alert(res.message);
+    }
   };
 
-  const clearCart = () => setCart([]);
+  const clearCart = async () => {
+    if (!currentUser?.id) {
+      setCart([]);
+      return;
+    }
+
+    const res = await clearCartRemote(currentUser.id);
+    if (res.ok) {
+      setCart(res.items);
+    } else {
+      alert(res.message);
+    }
+  };
 
   const handleCheckout = async () => {
-    if (!currentUser) {
+    if (!currentUser?.id) {
       alert('Debes iniciar sesión para finalizar la compra.');
       window.location.hash = '#login';
       return;
@@ -90,21 +122,21 @@ function App() {
       return;
     }
 
-    const res = await checkoutOrder(currentUser, cart);
+    const res = await checkoutOrder(currentUser);
     alert(res.message);
 
     if (res.ok) {
-      clearCart();
+      setCart([]);
       window.location.hash = '#perfil'; // Llevar al perfil para ver la orden creada
     }
   };
 
-  const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
+  const cartCount = activeCart.reduce((sum, item) => sum + item.qty, 0);
 
   const handleLogout = () => {
     logoutUser();
     setCurrentUser(null);
-    clearCart();
+    setCart([]);
     window.location.hash = '#inicio';
   };
 
@@ -203,7 +235,7 @@ function App() {
         <CartPage
           navbar={navbarData}
           footer={footerData}
-          cart={cart}
+          cart={activeCart}
           onAdd={addToCart}
           onRemove={removeFromCart}
           onClear={clearCart}
