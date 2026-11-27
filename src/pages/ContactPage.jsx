@@ -32,6 +32,10 @@ export function ContactPage({ navbar, footer }) {
     ],
     buttonText: "Enviar Mensaje",
     onSubmit: async (data) => {
+      if ((data.name?.trim() || '').length < 2) {
+        alert('El nombre debe tener al menos 2 caracteres.');
+        return;
+      }
       if ((data.subject?.trim() || '').length < 3) {
         alert('El asunto debe tener al menos 3 caracteres.');
         return;

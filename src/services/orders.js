@@ -1,140 +1,62 @@
 import { apiRequest } from './api';
 
-const ORDERS_KEY = 'poe_orders';
-
-// Obtener órdenes locales de respaldo
-function getLocalOrders() {
-  const saved = localStorage.getItem(ORDERS_KEY);
-  return saved ? JSON.parse(saved) : [];
-}
-
-// Guardar órdenes locales
-function saveLocalOrders(orders) {
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
-}
-
-// Realizar Checkout: sincroniza el carrito con el backend si es necesario y ejecuta checkout
-export async function checkoutOrder(user, cartItems = []) {
-  if (!user) {
+// Realizar Checkout (100% API): el backend lee el carrito persistente del usuario
+export async function checkoutOrder(user) {
+  if (!user || !user.id) {
     return { ok: false, message: 'Debes iniciar sesión para completar la compra.' };
   }
 
-  const userId = user.id;
-
-  if (userId) {
-    try {
-      // 1. Asegurar que los ítems del carrito estén en el carrito del backend
-      for (const item of cartItems) {
-        if (item.id) {
-          await apiRequest(`/api/v1/cart/${userId}/items`, {
-            method: 'POST',
-            body: JSON.stringify({
-              productId: item.id,
-              quantity: item.qty || 1
-            })
-          }).catch((err) => console.warn('Sync item error:', err.message));
-        }
-      }
-
-      // 2. Ejecutar el checkout de la orden
-      const order = await apiRequest(`/api/v1/orders/checkout/${userId}`, {
-        method: 'POST'
-      });
-      return { ok: true, message: `¡Orden creada con éxito! Código: ${order.orderNumber}`, order };
-    } catch (error) {
-      console.warn('Backend checkout falló, creando orden local...', error.message);
-    }
+  try {
+    const order = await apiRequest(`/api/v1/orders/checkout/${user.id}`, {
+      method: 'POST',
+    });
+    return {
+      ok: true,
+      message: `¡Orden creada con éxito! Código: ${order.orderNumber}`,
+      order,
+    };
+  } catch (error) {
+    return { ok: false, message: error.message };
   }
-
-  // Fallback local: Generar orden simulada si el backend no está disponible
-  const orderNumber = `ORD-2026-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-  const totalAmount = cartItems.reduce((sum, item) => {
-    const price = typeof item.price === 'number'
-      ? item.price
-      : parseFloat(String(item.price).replace(/[^0-9.]/g, '')) || 0;
-    return sum + price * (item.qty || 1);
-  }, 0);
-
-  const newOrder = {
-    id: Date.now(),
-    orderNumber,
-    userId: user.id || 1,
-    userName: user.name,
-    userEmail: user.email,
-    totalAmount,
-    status: 'PENDING',
-    createdAt: new Date().toISOString(),
-    items: cartItems.map(item => ({
-      id: Date.now() + Math.random(),
-      productId: item.id || 1,
-      productName: item.name,
-      priceAtPurchase: typeof item.price === 'number' ? item.price : parseFloat(String(item.price).replace(/[^0-9.]/g, '')) || 0,
-      quantity: item.qty || 1,
-      subtotal: (typeof item.price === 'number' ? item.price : parseFloat(String(item.price).replace(/[^0-9.]/g, '')) || 0) * (item.qty || 1),
-      imageUrl: item.src
-    }))
-  };
-
-  const orders = getLocalOrders();
-  orders.unshift(newOrder);
-  saveLocalOrders(orders);
-
-  return {
-    ok: true,
-    message: `¡Orden ${orderNumber} generada exitosamente!`,
-    order: newOrder
-  };
 }
 
 // Obtener órdenes de un usuario: GET /api/v1/orders/user/{userId}
 export async function getUserOrders(user) {
-  if (!user) return [];
+  if (!user || !user.id) return [];
 
-  if (user.id) {
-    try {
-      const data = await apiRequest(`/api/v1/orders/user/${user.id}`);
-      if (Array.isArray(data)) return data;
-    } catch (error) {
-      console.warn('Backend orders falló, leyendo local...', error.message);
-    }
+  try {
+    const data = await apiRequest(`/api/v1/orders/user/${user.id}`);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Error al obtener órdenes del usuario:', error.message);
+    return [];
   }
-
-  // Fallback local
-  const orders = getLocalOrders();
-  return orders.filter(o => o.userEmail === user.email || o.userId === user.id);
 }
 
 // Obtener todas las órdenes (Admin): GET /api/v1/orders
 export async function getAllOrders() {
   try {
     const data = await apiRequest('/api/v1/orders');
-    if (Array.isArray(data)) return data;
+    return Array.isArray(data) ? data : [];
   } catch (error) {
-    console.warn('Backend all orders falló, leyendo local...', error.message);
+    console.error('Error al obtener todas las órdenes:', error.message);
+    return [];
   }
-
-  return getLocalOrders();
 }
 
 // Actualizar estado de orden (Admin): PATCH /api/v1/orders/{orderId}/status
 export async function updateOrderStatus(orderId, status) {
+  if (!orderId || !status) {
+    return { ok: false, message: 'Orden o estado inválido.' };
+  }
+
   try {
     const updated = await apiRequest(`/api/v1/orders/${orderId}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ status }),
     });
     return { ok: true, order: updated };
   } catch (error) {
-    console.warn('Backend update order status falló, usando local...', error.message);
+    return { ok: false, message: error.message };
   }
-
-  const orders = getLocalOrders();
-  const idx = orders.findIndex(o => o.id === orderId || o.orderNumber === orderId);
-  if (idx !== -1) {
-    orders[idx].status = status;
-    saveLocalOrders(orders);
-    return { ok: true, order: orders[idx] };
-  }
-
-  return { ok: false, message: 'Orden no encontrada' };
 }

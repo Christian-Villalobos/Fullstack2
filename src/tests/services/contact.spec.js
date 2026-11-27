@@ -1,59 +1,62 @@
+import { api } from '../../services/api';
 import {
   getContactMessages,
   saveContactMessage,
   toggleMessageStatus,
-  deleteContactMessage
+  deleteContactMessage,
 } from '../../services/contact';
 
-describe('Contact Service', () => {
-  beforeEach(() => {
-    localStorage.clear();
+describe('Contact Service (Full API)', () => {
+  it('obtiene mensajes mapeados desde el backend', async () => {
+    spyOn(api, 'request').and.resolveTo({
+      data: [{
+        id: 1,
+        name: 'Exiliado',
+        email: 'exil@poe.com',
+        subject: 'Duda',
+        message: '¿Cuándo entregan mis Divine Orbs?',
+        status: 'UNREAD',
+        createdAt: '2026-11-24T23:50:00',
+      }],
+    });
+
+    const list = await getContactMessages();
+    expect(list.length).toBe(1);
+    expect(list[0].status).toBe('UNREAD');
   });
 
-  it('debe iniciar con lista vacía de mensajes', () => {
-    expect(getContactMessages()).toEqual([]);
-  });
+  it('envía un mensaje válido y rechaza campos cortos', async () => {
+    const spy = spyOn(api, 'request').and.resolveTo({ data: { id: 1 } });
 
-  it('debe guardar un mensaje de contacto', () => {
-    const res = saveContactMessage({
+    const invalid = await saveContactMessage({ name: 'A', email: 'a@b.com', subject: 'Hi', message: 'Corto' });
+    expect(invalid.ok).toBeFalse();
+    expect(spy).not.toHaveBeenCalled();
+
+    const valid = await saveContactMessage({
       name: 'Exiliado',
       email: 'exil@poe.com',
       subject: 'Duda con orden',
-      message: '¿Cuándo entregan mis Divine Orbs?'
+      message: '¿Cuándo entregan mis Divine Orbs?',
     });
-
-    expect(res.ok).toBeTrue();
-    const list = getContactMessages();
-    expect(list.length).toBe(1);
-    expect(list[0].name).toBe('Exiliado');
-    expect(list[0].status).toBe('Pendiente');
+    expect(valid.ok).toBeTrue();
   });
 
-  it('debe cambiar el estado de un mensaje a Resuelto', () => {
-    saveContactMessage({
-      name: 'Exiliado',
-      email: 'exil@poe.com',
-      message: 'Mensaje'
-    });
+  it('cambia el estado de UNREAD a IN_REVIEW y elimina mensajes', async () => {
+    const spy = spyOn(api, 'request').and.returnValues(
+      Promise.resolve({ data: [{ id: 1, status: 'UNREAD' }] }),
+      Promise.resolve({ data: { id: 1, status: 'IN_REVIEW' } }),
+      Promise.resolve({ data: [{ id: 1, status: 'IN_REVIEW' }] }),
+      Promise.resolve({ data: { message: 'Eliminado' } }),
+      Promise.resolve({ data: [] })
+    );
 
-    const [firstMsg] = getContactMessages();
-    const res = toggleMessageStatus(firstMsg.id);
+    const toggled = await toggleMessageStatus(1);
+    expect(toggled.ok).toBeTrue();
+    expect(toggled.messages[0].status).toBe('IN_REVIEW');
 
-    expect(res.ok).toBeTrue();
-    expect(getContactMessages()[0].status).toBe('Resuelto');
-  });
-
-  it('debe eliminar un mensaje de contacto', () => {
-    saveContactMessage({
-      name: 'Exiliado',
-      email: 'exil@poe.com',
-      message: 'Mensaje a borrar'
-    });
-
-    const [firstMsg] = getContactMessages();
-    const res = deleteContactMessage(firstMsg.id);
-
-    expect(res.ok).toBeTrue();
-    expect(getContactMessages().length).toBe(0);
+    const deleted = await deleteContactMessage(1);
+    expect(deleted.ok).toBeTrue();
+    expect(deleted.messages.length).toBe(0);
+    expect(spy).toHaveBeenCalledTimes(5);
   });
 });

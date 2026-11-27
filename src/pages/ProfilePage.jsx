@@ -60,7 +60,11 @@ export function ProfilePage({ navbar, footer }) {
 
     const handleToggleContactStatus = async (id) => {
         const res = await toggleMessageStatus(id);
-        if (res.ok) setContactMessages(res.messages);
+        if (res.ok) {
+            setContactMessages(res.messages);
+        } else {
+            alert(res.message);
+        }
     };
 
     const handleDeleteContactMessage = async (id) => {
@@ -68,7 +72,11 @@ export function ProfilePage({ navbar, footer }) {
         if (!confirmed) return;
 
         const res = await deleteContactMessage(id);
-        if (res.ok) setContactMessages(res.messages);
+        if (res.ok) {
+            setContactMessages(res.messages);
+        } else {
+            alert(res.message);
+        }
     };
 
     const handleUpdateOrderStatus = async (orderId, newStatus) => {

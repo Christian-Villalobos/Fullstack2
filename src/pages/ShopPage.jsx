@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShopTemplate } from '../components/templates/ShopTemplate';
-import { getProducts, defaultProducts } from '../services/products';
+import { getProducts } from '../services/products';
 
 const shopTitles = [
   { variant: "h1", content: "Tienda de Divisas", className: "titulo-principal" },
@@ -8,7 +8,7 @@ const shopTitles = [
 ];
 
 export function ShopPage({ navbar, footer, onAddToCart }) {
-  const [products, setProducts] = useState(defaultProducts);
+  const [products, setProducts] = useState([]);
 
   useEffect(() => {
     let isMounted = true;

@@ -1,80 +1,97 @@
+import { api } from '../../services/api';
 import {
-  getUsers,
   registerUser,
   loginUser,
   getCurrentUser,
   logoutUser,
   changePassword,
-  resetPassword
+  resetPassword,
+  updateProfile,
+  fetchUsers,
+  deleteUser,
+  isAdminUser,
 } from '../../services/auth';
 
-describe('auth service', () => {
+describe('auth service (Full API)', () => {
   beforeEach(() => localStorage.clear());
 
-  it('crea el administrador por defecto', () => {
-    const users = getUsers();
-    expect(users.length).toBe(1);
-    expect(users[0].role).toBe('admin');
-  });
+  it('registra un usuario nuevo vía API', async () => {
+    const mockUser = { id: 2, name: 'Ana', email: 'ana@mail.com', role: 'ROLE_USER' };
+    const spy = spyOn(api, 'request').and.resolveTo({ data: mockUser });
 
-  it('los usuarios quedan guardados entre llamadas', () => {
-    registerUser({ name: 'Ana', email: 'ana@mail.com', password: '123' });
-    expect(getUsers().length).toBe(2);
-    expect(getUsers().length).toBe(2);
-  });
-
-  it('registra un usuario nuevo con rol "user"', () => {
-    const result = registerUser({ name: 'Ana', email: 'ANA@mail.com', password: '123' });
+    const result = await registerUser({ name: 'Ana', email: 'ANA@mail.com', password: '1234' });
     expect(result.ok).toBeTrue();
-    expect(getUsers().find(u => u.email === 'ana@mail.com').role).toBe('user');
+    expect(result.user).toEqual(mockUser);
+    expect(spy).toHaveBeenCalledWith(jasmine.objectContaining({
+      url: '/api/v1/auth/register',
+      method: 'POST',
+    }));
   });
 
-  it('rechaza campos vacíos', () => {
-    expect(registerUser({ name: '', email: '', password: '' }).ok).toBeFalse();
-  });
-
-  it('rechaza un nombre formado solo por espacios', () => {
-    expect(registerUser({ name: '   ', email: 'a@b.com', password: '123' }).ok).toBeFalse();
-  });
-
-  it('rechaza correos duplicados', () => {
-    registerUser({ name: 'Ana', email: 'ana@mail.com', password: '123' });
-    const result = registerUser({ name: 'Otra', email: 'ana@mail.com', password: '456' });
+  it('rechaza campos vacíos sin llamar a la API', async () => {
+    const spy = spyOn(api, 'request');
+    const result = await registerUser({ name: '   ', email: '', password: '' });
     expect(result.ok).toBeFalse();
+    expect(spy).not.toHaveBeenCalled();
   });
 
-  it('login correcto guarda la sesión y logout la borra', () => {
-    const user = loginUser({ email: 'admin@poe.com', password: 'admin123' });
-    expect(user.name).toBe('Administrador');
+  it('login correcto guarda la sesión y logout la borra', async () => {
+    const admin = { id: 1, name: 'Administrador', email: 'admin@poe.com', role: 'ROLE_ADMIN' };
+    spyOn(api, 'request').and.resolveTo({ data: admin });
+
+    const res = await loginUser({ email: 'ADMIN@POE.COM', password: 'admin123' });
+    expect(res.ok).toBeTrue();
+    expect(res.user.name).toBe('Administrador');
     expect(getCurrentUser().email).toBe('admin@poe.com');
+    expect(isAdminUser(getCurrentUser())).toBeTrue();
 
     logoutUser();
     expect(getCurrentUser()).toBeNull();
   });
 
-  it('login fallido devuelve null y no guarda la sesión', () => {
-    expect(loginUser({ email: 'admin@poe.com', password: 'mal' })).toBeNull();
+  it('login fallido devuelve ok: false y no guarda la sesión', async () => {
+    spyOn(api, 'request').and.rejectWith(new Error('Credenciales inválidas'));
+
+    const res = await loginUser({ email: 'admin@poe.com', password: 'mal' });
+    expect(res.ok).toBeFalse();
+    expect(res.message).toBe('Credenciales inválidas');
     expect(getCurrentUser()).toBeNull();
   });
 
-  it('el login no es sensible a mayúsculas en el correo', () => {
-    expect(loginUser({ email: 'ADMIN@POE.COM', password: 'admin123' })).not.toBeNull();
+  it('permite cambiar y restablecer contraseña vía API', async () => {
+    const spy = spyOn(api, 'request').and.resolveTo({ data: { message: 'OK' } });
+
+    const changeRes = await changePassword({ id: 1 }, 'admin123', 'nueva1234');
+    expect(changeRes.ok).toBeTrue();
+
+    const resetRes = await resetPassword('admin@poe.com', 'reset1234');
+    expect(resetRes.ok).toBeTrue();
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 
-  it('permite cambiar la contraseña con la contraseña actual correcta', () => {
-    const res = changePassword('admin@poe.com', 'admin123', 'nueva1234');
+  it('actualiza el perfil y sincroniza la sesión local', async () => {
+    localStorage.setItem('poe_current_user', JSON.stringify({ id: 1, name: 'Viejo', role: 'ROLE_USER' }));
+    spyOn(api, 'request').and.resolveTo({ data: { id: 1, name: 'Nuevo', role: 'ROLE_USER' } });
+
+    const res = await updateProfile({ id: 1 }, { name: 'Nuevo' });
     expect(res.ok).toBeTrue();
-    expect(loginUser({ email: 'admin@poe.com', password: 'nueva1234' })).not.toBeNull();
+    expect(getCurrentUser().name).toBe('Nuevo');
   });
 
-  it('permite restablecer la contraseña olvidada con resetPassword', () => {
-    const res = resetPassword('admin@poe.com', 'reset1234');
-    expect(res.ok).toBeTrue();
-    expect(loginUser({ email: 'admin@poe.com', password: 'reset1234' })).not.toBeNull();
-  });
+  it('lista y elimina usuarios vía API', async () => {
+    const spy = spyOn(api, 'request').and.returnValues(
+      Promise.resolve({ data: [{ id: 2, name: 'Ana', email: 'ana@mail.com', role: 'ROLE_USER' }] }),
+      Promise.resolve({ data: { message: 'Usuario eliminado correctamente' } })
+    );
 
-  it('rechaza restablecer contraseña si el correo no existe', () => {
-    const res = resetPassword('fantasma@poe.com', 'reset1234');
-    expect(res.ok).toBeFalse();
+    const list = await fetchUsers();
+    expect(list.length).toBe(1);
+
+    const del = await deleteUser(2);
+    expect(del.ok).toBeTrue();
+    expect(spy).toHaveBeenCalledWith(jasmine.objectContaining({
+      url: '/api/v1/users/2',
+      method: 'DELETE',
+    }));
   });
 });
